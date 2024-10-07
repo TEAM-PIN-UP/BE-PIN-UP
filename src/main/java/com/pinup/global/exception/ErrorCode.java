@@ -14,6 +14,9 @@ public enum ErrorCode {
     ALREADY_EXIST_NICKNAME(HttpStatus.BAD_REQUEST, "ALREADY_EXIST_NICKNAME", "중복된 닉네임입니다."),
     INVALID_TOKEN(HttpStatus.BAD_REQUEST, "INVALID_TOKEN", "유효하지 않은 토큰입니다."),
     NOT_EXPIRED_ACCESS_TOKEN(HttpStatus.BAD_REQUEST, "NOT_EXPIRED_ACCESS_TOKEN", "만료되지 않은 Access Token입니다."),
+    ALREADY_EXIST_FRIEND_REQUEST(HttpStatus.BAD_REQUEST, "ALREADY_EXIST_FRIEND_REQUEST", "이미 존재하는 친구 요청입니다."),
+    SELF_FRIEND_REQUEST(HttpStatus.BAD_REQUEST, "SELF_FRIEND_REQUEST", "자기 자신에게 친구 요청을 보낼 수 없습니다."),
+
 
     /* 401 */
     ACCESS_DENIED(HttpStatus.UNAUTHORIZED, "ACCESS_DENIED", "유효한 인증 정보가 아닙니다."),
@@ -22,6 +25,7 @@ public enum ErrorCode {
     /* 403 */
     FORBIDDEN(HttpStatus.FORBIDDEN, "FORBIDDEN", "접근할 수 있는 권한이 없습니다."),
     EXPIRED_OR_PREVIOUS_REFRESH_TOKEN(HttpStatus.FORBIDDEN, "EXPIRED_OR_PREVIOUS_REFRESH_TOKEN", "만료되었거나 이전에 발급된 Refresh Token입니다."),
+    FRIEND_REQUEST_RECEIVER_MISMATCH(HttpStatus.FORBIDDEN, "FRIEND_REQUEST_RECEIVER_MISMATCH", "현재 사용자가 친구 요청의 수신자가 아닙니다."),
 
     /* 404 */
     MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND", "존재하지 않는 유저입니다."),

@@ -22,6 +22,9 @@ public class PinUpException extends RuntimeException {
     public static final PinUpException FRIEND_REQUEST_NOT_FOUND = new PinUpException(ErrorCode.FRIEND_REQUEST_NOT_FOUND);
     public static final PinUpException SSE_CONNECTION_ERROR = new PinUpException(ErrorCode.SSE_CONNECTION_ERROR);
     public static final PinUpException FRIENDSHIP_NOT_FOUND = new PinUpException(ErrorCode.FRIENDSHIP_NOT_FOUND);
+    public static final PinUpException ALREADY_EXIST_FRIEND_REQUEST = new PinUpException(ErrorCode.ALREADY_EXIST_FRIEND_REQUEST);
+    public static final PinUpException FRIEND_REQUEST_RECEIVER_MISMATCH = new PinUpException(ErrorCode.FRIEND_REQUEST_RECEIVER_MISMATCH);
+    public static final PinUpException SELF_FRIEND_REQUEST = new PinUpException(ErrorCode.SELF_FRIEND_REQUEST);
 
     private final ErrorCode errorCode;
 

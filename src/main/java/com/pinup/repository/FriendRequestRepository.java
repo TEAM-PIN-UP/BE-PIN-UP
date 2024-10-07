@@ -2,6 +2,7 @@ package com.pinup.repository;
 
 import com.pinup.entity.FriendRequest;
 import com.pinup.entity.Member;
+import com.pinup.global.enums.FriendRequestStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -18,4 +19,6 @@ public interface FriendRequestRepository extends JpaRepository<FriendRequest, Lo
     List<FriendRequest> findBySender(Member sender);
 
     List<FriendRequest> findByReceiver(Member receiver);
+
+    Optional<FriendRequest> findBySenderAndReceiverAndFriendRequestStatus(Member sender, Member receiver, FriendRequestStatus status);
 }

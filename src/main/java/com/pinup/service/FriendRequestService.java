@@ -4,6 +4,8 @@ import com.pinup.dto.response.FriendRequestResponse;
 import com.pinup.entity.FriendRequest;
 import com.pinup.entity.Member;
 import com.pinup.global.enums.FriendRequestStatus;
+import com.pinup.global.exception.PinUpException;
+import com.pinup.global.kafka.KafkaProduceService;
 import com.pinup.repository.FriendRequestRepository;
 import com.pinup.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,8 +24,8 @@ import static com.pinup.global.exception.PinUpException.*;
 public class FriendRequestService {
     private final FriendRequestRepository friendRequestRepository;
     private final MemberRepository memberRepository;
-    private final NotificationService notificationService;
     private final FriendShipService friendShipService;
+    private final KafkaProduceService kafkaProduceService;
 
     @Transactional
     public FriendRequestResponse sendFriendRequest(Long receiverId) {
@@ -34,28 +36,45 @@ public class FriendRequestService {
         Member receiver = memberRepository.findById(receiverId)
                 .orElseThrow(() -> MEMBER_NOT_FOUND);
 
+        validateSelfFriendRequest(sender, receiver);
+        validateDuplicateFriendRequest(sender, receiver);
+
         FriendRequest friendRequest = FriendRequest.builder()
                 .sender(sender)
                 .receiver(receiver)
                 .build();
         friendRequestRepository.save(friendRequest);
 
-        notificationService.sendNotification(receiver.getEmail(),
+        kafkaProduceService.sendNotification(receiver.getEmail(),
                 sender.getName() + "님이 친구 요청을 보냈습니다.");
 
         return FriendRequestResponse.from(friendRequest);
+    }
+
+    private void validateSelfFriendRequest(Member sender, Member receiver) {
+        if (sender.getEmail().equals(receiver.getEmail())) {
+            throw SELF_FRIEND_REQUEST;
+        }
+    }
+
+    private void validateDuplicateFriendRequest(Member sender, Member receiver) {
+        friendRequestRepository.findBySenderAndReceiverAndFriendRequestStatus(sender, receiver, PENDING)
+                .ifPresent(request -> {
+                    throw ALREADY_EXIST_FRIEND_REQUEST;
+                });
     }
 
     @Transactional
     public FriendRequestResponse acceptFriendRequest(Long friendRequestId) {
         FriendRequest friendRequest = friendRequestRepository.findById(friendRequestId)
                 .orElseThrow(() -> FRIEND_REQUEST_NOT_FOUND);
+        validateRequestReceiverIsCurrentUser(friendRequest);
 
         friendRequest.accept();
         friendRequestRepository.save(friendRequest);
         friendShipService.createFriendShip(friendRequest.getSender(), friendRequest.getReceiver());
 
-        notificationService.sendNotification(friendRequest.getSender().getEmail(),
+        kafkaProduceService.sendNotification(friendRequest.getSender().getEmail(),
                 friendRequest.getReceiver().getName() + "님이 친구 요청을 수락했습니다.");
 
         return FriendRequestResponse.from(friendRequest);
@@ -65,14 +84,24 @@ public class FriendRequestService {
     public FriendRequestResponse rejectFriendRequest(Long friendRequestId) {
         FriendRequest friendRequest = friendRequestRepository.findById(friendRequestId)
                 .orElseThrow(() -> FRIEND_REQUEST_NOT_FOUND);
+        validateRequestReceiverIsCurrentUser(friendRequest);
 
         friendRequest.reject();
         friendRequestRepository.save(friendRequest);
 
-        notificationService.sendNotification(friendRequest.getSender().getEmail(),
+        kafkaProduceService.sendNotification(friendRequest.getSender().getEmail(),
                 friendRequest.getReceiver().getName() + "님이 친구 요청을 거절했습니다.");
 
         return FriendRequestResponse.from(friendRequest);
+    }
+
+    private void validateRequestReceiverIsCurrentUser(FriendRequest friendRequest) {
+        String currentUserEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+        String friendRequestReceiverEmail = friendRequest.getReceiver().getEmail();
+
+        if (!currentUserEmail.equals(friendRequestReceiverEmail)) {
+            throw FRIEND_REQUEST_RECEIVER_MISMATCH;
+        }
     }
 
     @Transactional(readOnly = true)
