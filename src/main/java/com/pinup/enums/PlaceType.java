@@ -1,4 +1,4 @@
-package com.pinup.global.enums;
+package com.pinup.enums;
 
 public enum PlaceType {
     RESTAURANT,

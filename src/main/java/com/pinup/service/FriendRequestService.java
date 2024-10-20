@@ -17,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static com.pinup.global.enums.FriendRequestStatus.*;
+import static com.pinup.enums.FriendRequestStatus.PENDING;
 import static com.pinup.global.exception.PinUpException.*;
 
 @RequiredArgsConstructor

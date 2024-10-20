@@ -4,7 +4,7 @@ package com.pinup.service;
 import com.pinup.entity.Member;
 
 import com.pinup.global.response.TokenResponse;
-import com.pinup.global.enums.LoginType;
+import com.pinup.enums.LoginType;
 import com.pinup.global.exception.PinUpException;
 import com.pinup.global.jwt.JwtTokenProvider;
 import com.pinup.repository.MemberRepository;
@@ -64,13 +64,13 @@ public class AuthService {
         String socialId = (String) userInfo.get("sub");
         String email = (String) userInfo.get("email");
         String name = (String) userInfo.get("name");
-        String profilePictureUrl = (String) userInfo.get("picture");
+        String picture = (String) userInfo.get("picture");
 
         Member member = memberRepository.findByEmail(email)
                 .orElseGet(() -> memberRepository.save(Member.builder()
                         .email(email)
                         .name(name)
-                        .profileImageUrl(profilePictureUrl)
+                        .profileImage(picture)
                         .loginType(LoginType.GOOGLE)
                         .socialId(socialId)
                         .build()));

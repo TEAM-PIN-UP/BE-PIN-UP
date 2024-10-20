@@ -2,6 +2,9 @@ package com.pinup.global.config;
 
 import com.pinup.global.jwt.JwtTokenFilter;
 import com.pinup.global.jwt.JwtTokenProvider;
+import com.pinup.global.oauth2.handler.OAuth2LoginFailureHandler;
+import com.pinup.global.oauth2.handler.OAuth2LoginSuccessHandler;
+import com.pinup.global.oauth2.service.CustomOAuth2UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -23,10 +26,16 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final CustomOAuth2UserService customOAuth2UserService;
+    private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
+    private final OAuth2LoginFailureHandler oAuth2LoginFailureHandler;
 
     private static final String[] PERMITTED_API_URL = {
             "/api/auth",
             "/api/auth/**",
+            "/chats",
+            "/api/places",
+            "/api/places/**"
     };
 
     @Bean
@@ -56,16 +65,23 @@ public class SecurityConfig {
                 // 기본 인증 로그인 사용 안하고 JWT 로그인 사용하므로 disable
                 .httpBasic(AbstractHttpConfigurer::disable)
 
-                // 세션을 사용하지 않는 설정 추가
-                .sessionManagement(sessionManagement ->
-                        sessionManagement.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
                 .authorizeHttpRequests(authorizeRequest ->
                         authorizeRequest
                                 .requestMatchers("/").permitAll()
                                 .requestMatchers(PERMITTED_API_URL).permitAll()
                                 .anyRequest().authenticated()
                 )
+
+                // 세션을 사용하지 않는 설정 추가
+                .sessionManagement(sessionManagement ->
+                        sessionManagement.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
+//                .oauth2Login(oauth2 -> oauth2
+//                        .userInfoEndpoint(userInfoEndpoint -> userInfoEndpoint
+//                                .userService(customOAuth2UserService))
+//                        .successHandler(oAuth2LoginSuccessHandler)
+//                        .failureHandler(oAuth2LoginFailureHandler)
+//                )
                 .addFilterBefore(new JwtTokenFilter(jwtTokenProvider), UsernamePasswordAuthenticationFilter.class)
         ;
 
