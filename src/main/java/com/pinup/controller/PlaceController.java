@@ -22,16 +22,19 @@ public class PlaceController {
     }
 
     /**
-     * 네이버 지도에 등록된 장소의 세부 정보를 검색한다.
-     * @author 한종승
+     * 카카오맵 API - 카테고리로 장소 리스트 조회
      */
     @GetMapping("/search")
-    public ResponseEntity<ApiSuccessResponse<List<PlaceResponse>>> search(@RequestParam("query") String query) {
+    ResponseEntity<ApiSuccessResponse<List<PlaceResponse>>> searchPlacesByCategory(
+            @RequestParam("category") String category,
+            @RequestParam("longitude") String longitude,
+            @RequestParam("latitude") String latitude
+            ) {
 
-        List<PlaceResponse> result = placeService.search(query);
+        List<PlaceResponse> result = placeService.searchPlacesByCategory(category, longitude, latitude);
+
         return ResponseEntity
                 .status(HttpStatus.OK)
-                .body(ApiSuccessResponse
-                .from(result));
+                .body(ApiSuccessResponse.from(result));
     }
 }

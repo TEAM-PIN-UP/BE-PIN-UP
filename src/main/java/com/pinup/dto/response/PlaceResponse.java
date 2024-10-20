@@ -1,38 +1,37 @@
 package com.pinup.dto.response;
 
-import com.pinup.entity.Place;
-import lombok.*;
+import lombok.Builder;
+import lombok.Getter;
+
+import java.util.Map;
 
 @Getter
 @Builder
 public class PlaceResponse {
 
-//    private Long id;
-    private String name; // 장소명
-    private String address; // 주소
-    private String roadAddress; // 도로명
-    private String link;
+    private String kakaoMapId;
+    private String name;
     private String category;
-    private String description;
-    private String telephone;
-    private String defaultImgUrl; // 기본 이미지
-    private int latitude; // 위도
-    private int longitude; // 경도
-    private double averageRating; // 평균별점
-//    private String status; // 상태
-//    private String placeType;
+    private String phone;
+    private String address;
+    private String roadAddress;
+    private String longitudeX;
+    private String latitudeY;
+    private String distance;
+    private PlaceReviewInfoDto reviewData;
 
-    public static PlaceResponse from(Place place) {
+    public static PlaceResponse from(Map<String, Object> placeInfo) {
         return PlaceResponse.builder()
-//                .id(place.getId())
-                .name(place.getName())
-                .address(place.getAddress())
-                .roadAddress(place.getRoadAddress())
-                .defaultImgUrl(place.getDefaultImgUrl())
-                .latitude(place.getLatitude())
-                .longitude(place.getLongitude())
-//                .status(place.getStatus())
-//                .placeType(place.getPlaceType().name())
+                .kakaoMapId(placeInfo.get("kakaoMapId").toString())
+                .name(placeInfo.get("name").toString())
+                .category(placeInfo.get("category").toString())
+                .phone(placeInfo.get("phone").toString())
+                .address(placeInfo.get("address").toString())
+                .roadAddress(placeInfo.get("roadAddress").toString())
+                .longitudeX(placeInfo.get("longitudeX").toString())
+                .latitudeY(placeInfo.get("latitudeY").toString())
+                .distance(placeInfo.get("distance").toString())
+                .reviewData((PlaceReviewInfoDto) placeInfo.get("reviewData"))
                 .build();
     }
 }
