@@ -25,7 +25,7 @@ public class Review extends BaseTimeEntity {
     private String content;
 
     @Column(nullable = false)
-    private Double starRating;
+    private double starRating;
 
     @Column
     private String visitedDate;
@@ -45,7 +45,7 @@ public class Review extends BaseTimeEntity {
     private List<ReviewImage> reviewImages = new ArrayList<>();
 
     @Builder
-    public Review(String content, Double starRating, String visitedDate) {
+    public Review(String content, double starRating, String visitedDate) {
         this.content = content;
         this.starRating = starRating;
         this.visitedDate = visitedDate;

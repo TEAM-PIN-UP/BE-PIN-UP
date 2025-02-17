@@ -1,23 +1,21 @@
 package com.pinup.domain.place.repository.querydsl;
 
-import com.pinup.domain.member.entity.Member;
-import com.pinup.domain.place.dto.response.PlaceDetailResponse;
-import com.pinup.domain.place.dto.response.PlaceResponseWithFriendReview;
+import com.pinup.domain.bookmark.entity.BookMark;
+import com.pinup.domain.place.dto.response.MapPlaceResponse;
 import com.pinup.domain.place.entity.PlaceCategory;
 import com.pinup.domain.place.entity.SortType;
-import com.pinup.global.exception.EntityNotFoundException;
-import com.pinup.global.response.ErrorCode;
+import com.pinup.domain.review.dto.response.ReviewDetailResponse;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.core.types.dsl.NumberPath;
 import com.querydsl.core.types.dsl.NumberTemplate;
-import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static com.pinup.domain.bookmark.entity.QBookMark.bookMark;
@@ -34,13 +32,13 @@ public class PlaceRepositoryQueryDslImpl implements PlaceRepositoryQueryDsl{
     private final JPAQueryFactory queryFactory;
 
     @Override
-    public List<PlaceResponseWithFriendReview> findAllByMemberAndLocation(
-            Member loginMember, String query, PlaceCategory placeCategory, SortType sortType,
+    public List<MapPlaceResponse> findMapPlaces(
+            Long memberId, String query, PlaceCategory placeCategory, SortType sortType,
             double swLat, double swLon, double neLat, double neLon, double currLat, double currLon
     ) {
-
-        List<PlaceResponseWithFriendReview> result = queryFactory
-                .select(Projections.constructor(PlaceResponseWithFriendReview.class,
+        List<Long> targetMemberIds = fetchTargetMemberIds(memberId);
+        List<MapPlaceResponse> mapPlaces = queryFactory
+                .select(Projections.constructor(MapPlaceResponse.class,
                         place.kakaoPlaceId.as("kakaoPlaceId"),
                         place.name.as("name"),
                         review.starRating.avg().as("averageStarRating"),
@@ -50,117 +48,106 @@ public class PlaceRepositoryQueryDslImpl implements PlaceRepositoryQueryDsl{
                         place.longitude.as("longitude"),
                         place.placeCategory.as("placeCategory")
                 ))
-                .from(review)
-                .join(review.place, place)
+                .from(place)
+                .innerJoin(review).on(place.eq(review.place))
                 .where(place.status.eq("Y")
-                        .and(review.member.id.eq(loginMember.getId())
-                                .or(review.member.id.in(fetchPinBuddyIds(loginMember.getId())))
-                        )
-                        .and(place.latitude.between(swLat, neLat))
-                        .and(place.longitude.between(swLat, neLon))
-                        .and(searchByPlaceCategory(placeCategory)))
-                        .groupBy(place)
-                        .orderBy(searchBySortType(sortType, currLat, currLon, place.latitude, place.longitude))
-                        .fetch();
-        addImageInfoOnPlaceResult(result, loginMember);
-        return result;
+                    .and(review.member.id.in(targetMemberIds))
+                    .and(place.latitude.between(swLat, neLat))
+                    .and(place.longitude.between(swLon, neLon))
+                    .and(searchByQuery(query))
+                    .and(searchByPlaceCategory(placeCategory))
+                )
+                .groupBy(place)
+                .orderBy(searchBySortType(sortType, currLat, currLon, place.latitude, place.longitude))
+                .fetch();
+        for (MapPlaceResponse mapPlace : mapPlaces) {
+            String kakaoPlaceId = mapPlace.getKakaoPlaceId();
+            mapPlace.setReviewImageUrls(fetchThreeEarliestReviewImageUrls(targetMemberIds, kakaoPlaceId));
+            mapPlace.setReviewerProfileImageUrls(fetchThreeLatestReviewerProfileImageUrls(targetMemberIds, kakaoPlaceId));
+            mapPlace.setBookmark(isBookmark(kakaoPlaceId, memberId));
+        }
+
+        return mapPlaces;
     }
 
     @Override
-    public PlaceDetailResponse findByKakaoPlaceIdAndMember(
-            Member loginMember, String kakaoPlaceId, double currentLatitude, double currentLongitude
+    public MapPlaceResponse findMapPlaceDetail(
+            Long memberId, String kakaoPlaceId, double currLat, double currLon
     ) {
-        List<PlaceDetailResponse.ReviewDetailResponse> reviewDetailList = queryFactory
-                .select(Projections.constructor(
-                        PlaceDetailResponse.ReviewDetailResponse.class,
+        List<Long> targetMemberIds = fetchTargetMemberIds(memberId);
+        MapPlaceResponse mapPlaceDetail = queryFactory
+                .select(Projections.constructor(MapPlaceResponse.class,
+                        place.kakaoPlaceId.as("kakaoPlaceId"),
+                        place.name.as("name"),
+                        review.starRating.avg().as("averageStarRating"),
+                        review.id.countDistinct().as("reviewCount"),
+                        calculateDistance(currLat, currLon, place.latitude, place.longitude).as("distance"),
+                        place.latitude.as("latitude"),
+                        place.longitude.as("longitude"),
+                        place.placeCategory.as("placeCategory")
+                ))
+                .from(place)
+                .innerJoin(review).on(place.eq(review.place))
+                .where(place.status.eq("Y")
+                        .and(place.kakaoPlaceId.eq(kakaoPlaceId))
+                        .and(review.member.id.in(targetMemberIds))
+                )
+                .fetchOne();
+        if (mapPlaceDetail != null) {
+            mapPlaceDetail.setReviewImageUrls(fetchThreeEarliestReviewImageUrls(targetMemberIds, kakaoPlaceId));
+            mapPlaceDetail.setReviewerProfileImageUrls(fetchThreeLatestReviewerProfileImageUrls(targetMemberIds, kakaoPlaceId));
+            mapPlaceDetail.setBookmark(isBookmark(kakaoPlaceId, memberId));
+        }
+        return mapPlaceDetail;
+    }
+
+    @Override
+    public List<ReviewDetailResponse> findAllTargetMemberReviews(Long memberId, String kakaoPlaceId) {
+        List<Long> targetMemberIds = fetchTargetMemberIds(memberId);
+        List<ReviewDetailResponse> reviewDetails = queryFactory
+                .select(Projections.constructor(ReviewDetailResponse.class,
                         review.id.as("reviewId"),
-                        review.member.name.as("writerName"),
+                        review.member.nickname.as("writerName"),
                         review.member.reviews.size().as("writerTotalReviewCount"),
-                        review.starRating.as("starRating"),
-                        review.visitedDate.as("visitedDate"),
-                        review.content.as("content"),
+                        review.starRating,
+                        review.visitedDate,
+                        review.content,
                         review.member.profileImageUrl.as("writerProfileImageUrl")
                 ))
                 .from(review)
+                .innerJoin(reviewImage).on(review.eq(reviewImage.review))
                 .where(review.place.kakaoPlaceId.eq(kakaoPlaceId)
-                        .and(review.member.id.eq(loginMember.getId())
-                                .or(review.member.id.in(fetchPinBuddyIds(loginMember.getId())))
-                        )
+                        .and(review.member.id.in(targetMemberIds))
                 )
-                .orderBy(review.createdAt.desc())
                 .fetch();
-
-        for (PlaceDetailResponse.ReviewDetailResponse reviewDetailResponse : reviewDetailList) {
-
-            Long reviewId = reviewDetailResponse.getReviewId();
-
-            List<String> reviewImageUrls = queryFactory
-                    .select(reviewImage.url)
-                    .from(reviewImage)
-                    .where(reviewImage.review.id.eq(reviewId))
-                    .fetch();
-
-            reviewDetailResponse.setReviewImageUrls(reviewImageUrls);
+        for (ReviewDetailResponse reviewDetail : reviewDetails) {
+            Long reviewId = reviewDetail.getReviewId();
+            reviewDetail.setReviewImageUrls(fetchReviewImageUrls(reviewId));
         }
 
-        PlaceDetailResponse placeDetailResponse = queryFactory
-                .select(Projections.constructor(
-                                PlaceDetailResponse.class,
-                                place.name.as("placeName"),
-                                review.countDistinct().as("reviewCount"),
-                                review.starRating.avg().as("averageStarRating"),
-                                calculateDistance(currentLatitude, currentLongitude, place.latitude, place.longitude).as("distance"),
-                                place.latitude.as("latitude"),
-                                place.longitude.as("longitude"),
-                                place.placeCategory.as("placeCategory"),
-                                isBookmark(kakaoPlaceId, loginMember.getId()).as("isBookmark")
-                        )
-                )
-                .from(place)
-                .leftJoin(review).on(place.eq(review.place))
-                .where(place.kakaoPlaceId.eq(kakaoPlaceId)
-                        .and(review.member.id.eq(loginMember.getId())
-                                .or(review.member.id.in(fetchPinBuddyIds(loginMember.getId())))
-                        )
-                )
-                .fetchOne();
-
-        if (placeDetailResponse != null) {
-            placeDetailResponse.setReviewImageUrls(fetchReviewImageUrls(kakaoPlaceId, loginMember.getId()));
-            placeDetailResponse.setReviewerProfileImageUrls(fetchReviewerProfileImageUrls(kakaoPlaceId, loginMember.getId()));
-            placeDetailResponse.setReviews(reviewDetailList);
-        } else {
-            throw new EntityNotFoundException(ErrorCode.PLACE_NOT_FOUND);
-        }
-
-        return placeDetailResponse;
+        return reviewDetails;
     }
 
     @Override
-    public Long getReviewCount(Member loginMember, String kakaoPlaceId) {
+    public Long getReviewCount(Long memberId, String kakaoPlaceId) {
         return queryFactory
                 .select(review.count())
                 .from(review)
                 .where(review.place.kakaoPlaceId.eq(kakaoPlaceId)
-                        .and(review.member.id.eq(loginMember.getId())
-                                .or(review.member.id.in(fetchPinBuddyIds(loginMember.getId())))
-                        )
+                        .and(review.member.id.in(fetchTargetMemberIds(memberId)))
                 )
                 .fetchOne();
     }
 
     @Override
-    public Double getAverageStarRating(Member loginMember, String kakaoPlaceId) {
+    public Double getAverageStarRating(Long memberId, String kakaoPlaceId) {
         return queryFactory
                 .select(review.starRating.avg())
                 .from(place)
                 .join(review).on(place.eq(review.place))
                 .where(place.status.eq("Y")
-                        .and(place.kakaoPlaceId.eq(kakaoPlaceId))
-                        .and(review.member.id.eq(loginMember.getId())
-                                .or(review.member.id.in(fetchPinBuddyIds(loginMember.getId())))
-                        )
-
+                    .and(place.kakaoPlaceId.eq(kakaoPlaceId))
+                    .and(review.member.id.in(fetchTargetMemberIds(memberId)))
                 )
                 .fetchOne();
     }
@@ -176,7 +163,6 @@ public class PlaceRepositoryQueryDslImpl implements PlaceRepositoryQueryDsl{
     private OrderSpecifier<?> searchBySortType(
             SortType sortType, double currLat, double currLon,
             NumberPath<Double> placeLat, NumberPath<Double> placeLon
-
     ) {
         switch (sortType) {
             case LATEST -> {
@@ -194,36 +180,34 @@ public class PlaceRepositoryQueryDslImpl implements PlaceRepositoryQueryDsl{
         }
     }
 
-    private void addImageInfoOnPlaceResult(List<PlaceResponseWithFriendReview> result, Member loginMember) {
-        for (PlaceResponseWithFriendReview response : result) {
-            String kakaoPlaceId = response.getKakaoPlaceId();
-            response.setReviewImageUrls(fetchReviewImageUrls(kakaoPlaceId, loginMember.getId()));
-            response.setReviewerProfileImageUrls(fetchReviewerProfileImageUrls(kakaoPlaceId, loginMember.getId()));
-        }
-    }
-
-    private List<String> fetchReviewImageUrls(String kakaoPlaceId, Long loginMemberId) {
+    private List<String> fetchReviewImageUrls(Long reviewId) {
         return queryFactory
                 .select(reviewImage.url)
                 .from(reviewImage)
-                .join(review).on(reviewImage.review.eq(review))
-                .where(review.place.kakaoPlaceId.eq(kakaoPlaceId)
-                        .and(review.member.id.eq(loginMemberId)
-                                .or(review.member.id.in(fetchPinBuddyIds(loginMemberId))))
-                        .and(reviewImage.url.isNotNull()))
+                .where(reviewImage.review.id.eq(reviewId))
+                .fetch();
+    }
+
+    private List<String> fetchThreeEarliestReviewImageUrls(List<Long> targetMemberUrls, String kakaoPlaceId) {
+        return queryFactory
+                .selectDistinct(reviewImage.url)
+                .from(reviewImage)
+                .where(reviewImage.review.place.kakaoPlaceId.eq(kakaoPlaceId)
+                        .and(reviewImage.review.member.id.in(targetMemberUrls))
+                )
                 .orderBy(reviewImage.createdAt.asc())
                 .limit(3)
                 .fetch();
     }
 
-    private List<String> fetchReviewerProfileImageUrls(String kakaoPlaceId, Long loginMemberId) {
+    private List<String> fetchThreeLatestReviewerProfileImageUrls(List<Long> targetMemberIds, String kakaoPlaceId) {
         return queryFactory
                 .selectDistinct(member.profileImageUrl)
                 .from(member)
-                .join(review).on(member.eq(review.member))
+                .innerJoin(review).on(member.eq(review.member))
                 .where(review.place.kakaoPlaceId.eq(kakaoPlaceId)
-                        .and(review.member.id.eq(loginMemberId)
-                                .or(review.member.id.in(fetchPinBuddyIds(loginMemberId)))))
+                        .and(review.member.id.in(targetMemberIds))
+                )
                 .orderBy(review.updatedAt.desc())
                 .limit(3)
                 .fetch();
@@ -238,6 +222,14 @@ public class PlaceRepositoryQueryDslImpl implements PlaceRepositoryQueryDsl{
         );
     }
 
+    private List<Long> fetchTargetMemberIds(Long memberId) {
+        List<Long> targetMemberIds = new ArrayList<>();
+        targetMemberIds.add(memberId);
+        targetMemberIds.addAll(fetchPinBuddyIds(memberId));
+
+        return targetMemberIds;
+    }
+
     private List<Long> fetchPinBuddyIds(Long memberId) {
         return queryFactory
                 .select(friendShip.friend.id)
@@ -246,13 +238,13 @@ public class PlaceRepositoryQueryDslImpl implements PlaceRepositoryQueryDsl{
                 .fetch();
     }
 
-    private BooleanExpression isBookmark(String kakaoPlaceId, Long memberId) {
-
-        return JPAExpressions
-                .selectOne()
-                .from(bookMark)
+    private boolean isBookmark(String kakaoPlaceId, Long memberId) {
+        BookMark entity = queryFactory
+                .selectFrom(bookMark)
                 .where(bookMark.place.kakaoPlaceId.eq(kakaoPlaceId)
                         .and(bookMark.member.id.eq(memberId)))
-                .exists();
+                .fetchOne();
+
+        return entity != null;
     }
 }

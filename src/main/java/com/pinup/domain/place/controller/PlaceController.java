@@ -1,8 +1,8 @@
 package com.pinup.domain.place.controller;
 
-import com.pinup.domain.place.dto.response.PlaceDetailResponse;
-import com.pinup.domain.place.dto.response.PlaceResponseByKeyword;
-import com.pinup.domain.place.dto.response.PlaceResponseWithFriendReview;
+import com.pinup.domain.place.dto.response.MapPlaceDetailResponse;
+import com.pinup.domain.place.dto.response.EntirePlaceResponse;
+import com.pinup.domain.place.dto.response.MapPlaceResponse;
 import com.pinup.global.response.ResultResponse;
 import com.pinup.domain.place.service.PlaceService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -34,15 +34,15 @@ public class PlaceController {
 
     @GetMapping
     @Operation(
-            summary = "리뷰 있는 장소 목록 조회 API",
-            description = "리뷰 있는 장소 목록만 조회(랜딩 페이지에서 사용)"
+            summary = "리뷰 있는 장소 목록만 조회 API",
+            description = "리뷰 있는 장소 목록만 조회"
     )
     @ApiResponses(value = {
             @ApiResponse(
                     responseCode = "200",
                     description = "장소 목록 조회에 성공하였습니다.",
                     content = {
-                            @Content(schema = @Schema(implementation = PlaceResponseWithFriendReview.class))
+                            @Content(schema = @Schema(implementation = MapPlaceResponse.class))
                     }
             )
     })
@@ -74,7 +74,7 @@ public class PlaceController {
             @Schema(description = "현 위치 경도", example = "126.826539")
             @RequestParam(value = "currentLongitude") double currentLongitude
     ) {
-        List<PlaceResponseWithFriendReview> result = placeService.getPlaces(
+        List<MapPlaceResponse> result = placeService.getMapPlaces(
                 query, category, sort, swLatitude, swLongitude, neLatitude, neLongitude, currentLatitude, currentLongitude
         );
         return ResponseEntity.ok(ResultResponse.of(GET_PLACES_SUCCESS, result));
@@ -87,11 +87,11 @@ public class PlaceController {
                     responseCode = "200",
                     description = "장소 상세 조회에 성공하였습니다.",
                     content = {
-                            @Content(schema = @Schema(implementation = PlaceDetailResponse.class))
+                            @Content(schema = @Schema(implementation = MapPlaceDetailResponse.class))
                     }
             )
     })
-    public ResponseEntity<ResultResponse> getPlaceDetail(
+    public ResponseEntity<ResultResponse> getMapPlaceDetail(
             @Schema(description = "카카오맵 장소 고유 ID", example = "1997608947")
             @PathVariable("kakaoPlaceId") String kakaoPlaceId,
             @Schema(description = "현 위치 위도", example = "37.562651")
@@ -99,7 +99,7 @@ public class PlaceController {
             @Schema(description = "현 위치 경도", example = "126.826539")
             @RequestParam(value = "currentLongitude") double currentLongitude
     ) {
-        PlaceDetailResponse result = placeService.getPlaceDetail(kakaoPlaceId, currentLatitude, currentLongitude);
+        MapPlaceDetailResponse result = placeService.getMapPlaceDetail(kakaoPlaceId, currentLatitude, currentLongitude);
         return ResponseEntity.ok(ResultResponse.of(GET_PLACE_DETAIL_SUCCESS, result));
     }
 
@@ -110,14 +110,14 @@ public class PlaceController {
                     responseCode = "200",
                     description = "장소 목록 조회에 성공하였습니다.",
                     content = {
-                            @Content(schema = @Schema(implementation = PlaceResponseByKeyword.class))
+                            @Content(schema = @Schema(implementation = EntirePlaceResponse.class))
                     }
             )
     })
-    public ResponseEntity<ResultResponse> getPlacesByKeyword(
+    public ResponseEntity<ResultResponse> getEntirePlaces(
             @Schema(description = "검색어", example = "하루카페") @RequestParam(value = "query") String query
     ) {
-        List<PlaceResponseByKeyword> result = placeService.getPlacesByKeyword(query);
+        List<EntirePlaceResponse> result = placeService.getEntirePlaces(query);
         return ResponseEntity.ok(ResultResponse.of(GET_PLACES_SUCCESS, result));
     }
 }

@@ -1,17 +1,16 @@
 package com.pinup.domain.place.service;
 
 import com.pinup.domain.member.entity.Member;
-import com.pinup.domain.place.dto.response.PlaceDetailResponse;
-import com.pinup.domain.place.dto.response.PlaceResponseByKeyword;
-import com.pinup.domain.place.dto.response.PlaceResponseWithFriendReview;
+import com.pinup.domain.place.dto.response.MapPlaceDetailResponse;
+import com.pinup.domain.place.dto.response.MapPlaceResponse;
+import com.pinup.domain.place.dto.response.EntirePlaceResponse;
 import com.pinup.domain.place.entity.PlaceCategory;
 import com.pinup.domain.place.entity.SortType;
 import com.pinup.domain.place.repository.PlaceRepository;
+import com.pinup.domain.review.dto.response.ReviewDetailResponse;
 import com.pinup.global.common.AuthUtil;
 import com.pinup.global.config.kakao.KakaoMapModule;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,49 +22,49 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class PlaceService {
 
-    private static final Logger log = LoggerFactory.getLogger(PlaceService.class);
     private final AuthUtil authUtil;
     private final KakaoMapModule kakaoMapModule;
     private final PlaceRepository placeRepository;
 
-    @Transactional
-    public List<PlaceResponseWithFriendReview> getPlaces(
+    @Transactional(readOnly = true)
+    public List<MapPlaceResponse> getMapPlaces(
             String query, String category, String sort,
             double swLat, double swLon, double neLat,
             double neLon, double currLat, double currLon
     ) {
         Member loginMember = authUtil.getLoginMember();
-
         PlaceCategory placeCategory = PlaceCategory.getCategory(category);
         SortType sortType = SortType.getSortType(sort);
 
-        return placeRepository.findAllByMemberAndLocation(
-                loginMember, query, placeCategory, sortType,
+        return placeRepository.findMapPlaces(
+                loginMember.getId(), query, placeCategory, sortType,
                 swLat, swLon, neLat,
                 neLon, currLat, currLon
         );
     }
 
     @Transactional(readOnly = true)
-    public PlaceDetailResponse getPlaceDetail(String kakaoPlaceId, double currentLatitude, double currentLongitude) {
+    public MapPlaceDetailResponse getMapPlaceDetail(String kakaoPlaceId, double currentLatitude, double currentLongitude) {
         Member loginMember = authUtil.getLoginMember();
-        PlaceDetailResponse placeDetailResponse =
-                placeRepository.findByKakaoPlaceIdAndMember(loginMember, kakaoPlaceId, currentLatitude, currentLongitude);
-        List<PlaceDetailResponse.ReviewDetailResponse> reviewDetailResponseList = placeDetailResponse.getReviews();
+        MapPlaceResponse mapPlaceResponse = placeRepository.findMapPlaceDetail(
+                loginMember.getId(), kakaoPlaceId, currentLatitude, currentLongitude
+        );
+        List<ReviewDetailResponse> reviewDetails = placeRepository.findAllTargetMemberReviews(
+                loginMember.getId(), kakaoPlaceId
+        );
         Map<Integer, Integer> ratingGraph = new HashMap<>();
-        for (PlaceDetailResponse.ReviewDetailResponse reviewDetailResponse : reviewDetailResponseList) {
-            int range = (int) Math.floor(reviewDetailResponse.getStarRating());
+        for (ReviewDetailResponse reviewDetail : reviewDetails) {
+            int range = (int) Math.floor(reviewDetail.getStarRating());
             ratingGraph.put(range, ratingGraph.getOrDefault(range, 0) + 1);
         }
-        placeDetailResponse.setRatingGraph(ratingGraph);
 
-        return placeDetailResponse;
+        return MapPlaceDetailResponse.from(mapPlaceResponse, ratingGraph, reviewDetails);
     }
 
     @Transactional(readOnly = true)
-    public List<PlaceResponseByKeyword> getPlacesByKeyword(String keyword) {
+    public List<EntirePlaceResponse> getEntirePlaces(String keyword) {
         Member loginMember = authUtil.getLoginMember();
 
-        return kakaoMapModule.search(loginMember, keyword);
+        return kakaoMapModule.search(loginMember.getId(), keyword);
     }
 }

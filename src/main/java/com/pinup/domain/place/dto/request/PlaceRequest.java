@@ -42,13 +42,10 @@ public class PlaceRequest {
     private Double longitude; // 경도(X)
 
     public Place toEntity() {
-
-        PlaceCategory placeCategory = PlaceCategory.getCategory(category);
-
         return Place.builder()
                 .kakaoPlaceId(kakaoPlaceId)
                 .name(name)
-                .placeCategory(placeCategory)
+                .placeCategory(PlaceCategory.getCategory(category))
                 .address(address)
                 .roadAddress(roadAddress)
                 .latitude(latitude)

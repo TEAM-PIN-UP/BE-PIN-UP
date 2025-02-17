@@ -16,7 +16,7 @@ public class ReviewRequest {
 
     @NotNull(message = "별점을 입력하세요")
     @Schema(description = "별점(최소 0.5 ~ 최대 5.0 / 0.5점 단위)", example = "3.5")
-    private Double starRating;
+    private double starRating;
 
     @NotBlank(message = "방문 날짜를 입력해주세요.")
     @Schema(description = "방문 날짜", example = "20241208")

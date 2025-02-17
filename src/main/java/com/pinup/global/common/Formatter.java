@@ -10,7 +10,6 @@ public class Formatter {
 
     public static double formatStarRating(double starRating) {
         return BigDecimal.valueOf(starRating).setScale(1, RoundingMode.HALF_UP).doubleValue();
-
     }
 
     public static String formatDistance(double distance) {
